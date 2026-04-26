@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ApaKabar PWA</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png" type="image/png">
+    <meta name="theme-color" content="#007bff">
+</head>
+<body class="system">
+    <header>
+        <h1>ApaKabar</h1>
+    </header>
+
+    <main id="app"></main>
+
+    <nav>
+        <button onclick="navigate('home')">🏠 Home</button>
+        <button onclick="navigate('discover')">🔍 Discover</button>
+        <button onclick="navigate('bookmark')">🔖 Bookmark</button>
+        <button onclick="navigate('settings')">⚙️ Settings</button>
+    </nav>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    </script>
+</body>
+</html>
