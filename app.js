@@ -5,78 +5,73 @@ const $ = id => document.getElementById(id);
 let state = {
     page: 'home',
     theme: localStorage.getItem('theme') || 'system',
-    bookmarks: JSON.parse(localStorage.getItem('bm')) || [],
+    bookmark: JSON.parse(localStorage.getItem('bm')) || [],
     prefs: JSON.parse(localStorage.getItem('prefs')) || [],
     ds: { data: [], page: 1, q: '', cat: '', loading: false } // ds = discover state
 };
 
 // 2. OFFLINE TRAP & API WRAPPER
-window.addEventListener('offline', () => location.href = 'game.html');
+window.addEventListener('offline', () => location.href = 'backup-game.html');
 const api = async (endpoint) => {
-    try { return await (await fetch(API_URL + endpoint)).json(); } 
+    try { return await (await fetch(API_URL + endpoint)).json(); }
     catch (err) {
-        console.warn("API Offline, menggunakan data lokal untuk testing.");
-    
+        console.warn("API Offline");
+
         // 1. Dummy untuk Kategori (digunakan di halaman Discover/Settings)
         if (endpoint.includes("categories")) {
-            return { 
+            return {
                 data: [
-                    { id: 1, name: "Nasional" }, 
+                    { id: 1, name: "Nasional" },
                     { id: 2, name: "Internasional" },
                     { id: 3, name: "Teknologi" },
                     { id: 4, name: "Hiburan" }
-                ] 
+                ]
             };
         }
-    
+
         // 2. Dummy untuk Posts/Berita (digunakan di Home, Discover, Detail, dan Bookmark)
         if (endpoint.includes("posts")) {
-            const dummyPosts = [
-                { 
-                    id: 1, 
-                    title: "LKS Nasional 2026: Persiapan Modul Mobile Web Service", 
+            const FakePost = [
+                {
+                    id: 1,
+                    title: "Contoh 1",
                     category: "Nasional",
                     views: 1240,
-                    author: "Admin LKS",
+                    author: "Admin",
                     date: "2026-04-11",
-                    cover_image: "https://via.placeholder.com/400x200?text=LKS+Nasional+2026", 
-                    content: "Ini adalah konten berita simulasi. Pastikan properti seperti tags dan author terisi agar renderDetail tidak error saat mencoba membaca properti tersebut.",
-                    tags: ["LKS", "Web", "Nasional", "Simulasi"], // Wajib ada karena ada fungsi .join() di app.js
+                    cover_image: "img1.jpg",
+                    content: "Isi berita contoh 1",
+                    tags: ["Nasional"],
                     breaking: true
                 },
-                { 
-                    id: 2, 
-                    title: "Teknologi PWA Semakin Diminati Industri", 
+                {
+                    id: 2,
+                    title: "Contoh 2",
                     category: "Teknologi",
                     views: 850,
-                    author: "Tech Insider",
+                    author: "Admin",
                     date: "2026-04-10",
-                    cover_image: "https://via.placeholder.com/400x200?text=PWA+Technology",
-                    content: "Progressive Web App memberikan pengalaman layaknya aplikasi native namun tetap ringan dijalankan di browser mobile.",
-                    tags: ["PWA", "ServiceWorker", "Web"],
+                    cover_image: "img2.jpg",
+                    content: "Isi berita contoh 2",
+                    tags: ["Teknologi"],
                     breaking: false
                 }
             ];
-
             // Jika request spesifik per ID (misal: /posts/1)
             const match = endpoint.match(/\/posts\/(\d+)/);
             if (match) {
-                const post = dummyPosts.find(p => p.id == match[1]) || dummyPosts[0];
+                const post = FakePost.find(p => p.id == match[1]) || FakePost[0];
                 return { data: post };
             }
-
-            return { data: dummyPosts };
+            return { data: FakePost };
         }
-
         return { data: [] }; // Fallback terakhir
     }
 };
-
 // 3. THEME MANAGER
 const applyTheme = () => document.body.className = state.theme;
 window.setTheme = (t) => { state.theme = t; localStorage.setItem('theme', t); applyTheme(); };
 applyTheme();
-
 // 4. ROUTER & RENDERER
 window.navigate = (page) => { state.page = page; render(); };
 
@@ -100,33 +95,41 @@ const render = async () => {
             <div class="h-scroll">${(news?.data || []).map(renderCard).join('')}</div>
             <br><h2>For You</h2>
             <div>${(recs?.data || []).map(renderCard).join('')}</div>`;
-            
+
     } else if (state.page === 'discover') {
         app.innerHTML = `
             <input type="text" placeholder="Search..." oninput="searchDebounce(this.value)">
             <select onchange="filterCat(this.value)" id="cat-select"><option value="">All Categories</option></select>
             <div id="res"></div><p id="loader" style="display:none">Loading more...</p>`;
-        
+
         const cats = await api('/categories');
-        if(cats) $('cat-select').innerHTML += cats.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-        
+        if (cats) $('cat-select').innerHTML += cats.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
         state.ds = { data: [], page: 1, q: '', cat: '', loading: false };
         loadMoreDiscover();
-        
+
     } else if (state.page === 'bookmark') {
-        if (!state.bookmarks.length) return app.innerHTML = '<p>No bookmarks.</p>';
-        const res = await Promise.all(state.bookmarks.map(id => api(`/posts/${id}`)));
+        if (!state.bookmark.length) return app.innerHTML = '<p>No bookmark.</p>';
+        const res = await Promise.all(state.bookmark.map(id => api(`/posts/${id}`)));
         app.innerHTML = res.map(r => renderCard(r.data)).join('');
-        
+
     } else if (state.page === 'settings') {
+        let c = await api('/categories');
+        let prefUI = (c?.data || []).map(x => `<label><input type="checkbox" onchange="togglePref('${x.name}')" ${state.prefs.includes(x.name) ? 'checked' : ''}> ${x.name}</label><br>`).join('');
         app.innerHTML = `
             <h2>Theme</h2>
             <select onchange="setTheme(this.value)">
-                <option value="system" ${state.theme=='system'?'selected':''}>System</option>
-                <option value="light" ${state.theme=='light'?'selected':''}>Light</option>
-                <option value="dark" ${state.theme=='dark'?'selected':''}>Dark</option>
-            </select>`;
+                <option value="system" ${state.theme == 'system' ? 'selected' : ''}>System</option>
+                <option value="light" ${state.theme == 'light' ? 'selected' : ''}>Light</option>
+                <option value="dark" ${state.theme == 'dark' ? 'selected' : ''}>Dark</option>
+            </select>
+            <br><br><h2>Kategori Favorit</h2>${prefUI}`;
     }
+};
+
+window.togglePref = (c) => {
+    state.prefs = state.prefs.includes(c) ? state.prefs.filter(x => x !== c) : [...state.prefs, c];
+    localStorage.setItem('prefs', JSON.stringify(state.prefs));
 };
 
 // 5. DISCOVER (DEBOUNCE & INFINITE SCROLL)
@@ -152,7 +155,7 @@ const loadMoreDiscover = async () => {
         $('res').innerHTML = state.ds.data.map(renderCard).join('');
         state.ds.page++;
     }
-    
+
     state.ds.loading = false;
     if ($('loader')) $('loader').style.display = 'none';
 };
@@ -170,8 +173,8 @@ window.viewDetail = async (id) => {
     const res = await api(`/posts/${id}`);
     if (!res) return;
     const p = res.data;
-    
-    const isBm = state.bookmarks.includes(p.id);
+
+    const isBm = state.bookmark.includes(p.id);
     app.innerHTML = `
         <button class="btn" onclick="navigate('home')">Back</button>
         <button class="btn" onclick="toggleBm(${p.id})">${isBm ? 'Unbookmark' : 'Bookmark'}</button>
@@ -180,18 +183,18 @@ window.viewDetail = async (id) => {
         <h2>${p.title}</h2>
         <p><small>${p.date}</small></p>
         <div style="margin:15px 0;">${p.content}</div>
-        <p>Tags: ${p.tags.join(', ')}</p>
+        <p>Tags: ${(p.tags || []).join(', ')}</p>
         <hr><br><h3>Related Articles</h3><div id="related"></div>
     `;
-    
+
     const related = await api(`/posts?category=${p.category}&limit=3`);
     $('related').innerHTML = (related?.data || []).filter(r => r.id !== p.id).map(renderCard).join('');
 };
 
 window.toggleBm = (id) => {
-    if (state.bookmarks.includes(id)) state.bookmarks = state.bookmarks.filter(b => b !== id);
-    else state.bookmarks.push(id);
-    localStorage.setItem('bm', JSON.stringify(state.bookmarks));
+    if (state.bookmark.includes(id)) state.bookmark = state.bookmark.filter(b => b !== id);
+    else state.bookmark.push(id);
+    localStorage.setItem('bm', JSON.stringify(state.bookmark));
     viewDetail(id); // Re-render detail untuk update tombol
 };
 
